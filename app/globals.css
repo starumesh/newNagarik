@@ -1,0 +1,98 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+@layer base {
+  :root {
+    --background: #f6f3ec;
+    --foreground: #1e293b;
+    --card: #fffcf7;
+    --card-foreground: #1e293b;
+    --popover: #fffcf7;
+    --popover-foreground: #1e293b;
+    --primary: #0d9488;
+    --primary-foreground: #f4fffd;
+    --secondary: #e8efe9;
+    --secondary-foreground: #1e293b;
+    --muted: #eee8dc;
+    --muted-foreground: #5b6573;
+    --accent: #d9f2ee;
+    --accent-foreground: #115e59;
+    --destructive: #b42318;
+    --destructive-foreground: #fff7f6;
+    --border: #d9d1c3;
+    --input: #d9d1c3;
+    --ring: #0d9488;
+    --radius: 0.75rem;
+    --sidebar: #fffcf7;
+    --sidebar-foreground: #1e293b;
+    --sidebar-primary: #0d9488;
+    --sidebar-primary-foreground: #f4fffd;
+    --sidebar-accent: #e8efe9;
+    --sidebar-accent-foreground: #1e293b;
+    --sidebar-border: #d9d1c3;
+    --sidebar-ring: #0d9488;
+    --chart-1: #0d9488;
+    --chart-2: #1e293b;
+    --chart-3: #b45309;
+    --chart-4: #0f766e;
+    --chart-5: #64748b;
+  }
+
+  .dark {
+    --background: #0b1220;
+    --foreground: #e8eef6;
+    --card: #121a2a;
+    --card-foreground: #e8eef6;
+    --popover: #121a2a;
+    --popover-foreground: #e8eef6;
+    --primary: #2dd4bf;
+    --primary-foreground: #042f2e;
+    --secondary: #1e293b;
+    --secondary-foreground: #e8eef6;
+    --muted: #1e293b;
+    --muted-foreground: #94a3b8;
+    --accent: #134e4a;
+    --accent-foreground: #ccfbf1;
+    --destructive: #f87171;
+    --destructive-foreground: #1f0a0a;
+    --border: #243044;
+    --input: #243044;
+    --ring: #2dd4bf;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    @apply font-sans scroll-smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    background-image:
+      radial-gradient(circle at 1px 1px, rgba(30, 41, 59, 0.05) 1px, transparent 0);
+    background-size: 22px 22px;
+  }
+}
+
+@layer components {
+  .stamp-badge {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-teal/30 bg-teal/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-teal-700;
+  }
+
+  .ledger-card {
+    @apply rounded-2xl border border-border bg-card shadow-ledger;
+  }
+
+  .unlock-banner {
+    @apply fixed inset-x-0 bottom-0 z-40 border-t border-navy/10 bg-navy text-cream;
+  }
+}

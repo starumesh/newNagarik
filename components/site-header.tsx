@@ -1,11 +1,50 @@
+"use client";
+
 import Link from "next/link";
-import { Scale } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { BrandLogo } from "@/components/brand-logo";
 import { buttonVariants } from "@/components/ui/button";
 import { SignOutButton } from "@/components/sign-out-button";
 import { TrustBadge } from "@/components/trust-badge";
-import { canAccessGranularData } from "@/lib/access";
+import { canAccessSearch } from "@/lib/access";
 import type { UserProfile } from "@/lib/types";
 import { cn } from "@/lib/utils";
+
+function NavLink({
+  href,
+  children,
+  disabled,
+}: {
+  href: string;
+  children: React.ReactNode;
+  disabled?: boolean;
+}) {
+  const pathname = usePathname();
+  const active = pathname === href || pathname.startsWith(`${href}/`);
+
+  if (disabled) {
+    return (
+      <span
+        className="cursor-not-allowed text-navy/30"
+        title="Finish onboarding as an owner or renter to search places"
+      >
+        {children}
+      </span>
+    );
+  }
+
+  return (
+    <Link
+      href={href}
+      className={cn(
+        "transition-colors hover:text-navy",
+        active ? "font-semibold text-navy" : "text-navy/70"
+      )}
+    >
+      {children}
+    </Link>
+  );
+}
 
 export function SiteHeader({
   profile,
@@ -14,60 +53,46 @@ export function SiteHeader({
   profile: UserProfile | null;
   unread?: number;
 }) {
-  const verified = canAccessGranularData(profile);
+  const canSearch = canAccessSearch(profile);
 
   return (
     <header className="sticky top-0 z-30 border-b border-navy/10 bg-cream/85 backdrop-blur">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
-        <Link href={profile ? "/dashboard" : "/"} className="flex items-center gap-2">
-          <span className="grid size-8 place-items-center rounded-full bg-navy text-cream">
-            <Scale className="size-4" />
-          </span>
-          <span className="font-serif text-xl tracking-tight text-navy">
-            RentSahih
-          </span>
-        </Link>
-        <nav className="hidden items-center gap-6 text-sm text-navy/80 sm:flex">
+      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-4">
+        <BrandLogo href={profile ? "/dashboard" : "/"} markSize={34} />
+        <nav className="flex flex-1 items-center justify-end gap-4 text-sm sm:gap-6">
           {profile ? (
             <>
-              <Link href="/dashboard">Ledger</Link>
-              <Link
-                href="/search"
-                className={cn(!verified && "pointer-events-none opacity-40")}
-                aria-disabled={!verified}
-              >
+              <NavLink href="/dashboard">Home</NavLink>
+              <NavLink href="/search" disabled={!canSearch}>
                 Search
-              </Link>
-              <Link href="/inbox" className="relative">
-                Inbox
-                {unread > 0 ? (
-                  <span className="absolute -right-3 -top-2 size-2 rounded-full bg-red-500" />
-                ) : null}
-              </Link>
+              </NavLink>
+              <NavLink href="/inbox">
+                <span className="relative inline-flex items-center gap-1">
+                  Inbox
+                  {unread > 0 ? (
+                    <span className="size-1.5 rounded-full bg-red-500" aria-hidden />
+                  ) : null}
+                </span>
+              </NavLink>
               {profile.role === "owner" ? (
-                <Link href="/listings/new">List</Link>
+                <NavLink href="/listings/new">Post listing</NavLink>
               ) : null}
+              <TrustBadge score={profile.trust_score} className="hidden sm:inline-flex" />
+              <SignOutButton />
             </>
           ) : (
             <>
-              <Link href="/#how">How it works</Link>
-              <Link href="/#trust">Trust engine</Link>
+              <NavLink href="/#how">How it works</NavLink>
+              <NavLink href="/#trust">How rents stay honest</NavLink>
+              <Link
+                href="/dashboard"
+                className={cn(buttonVariants({ size: "sm" }), "rounded-full px-4")}
+              >
+                Explore properties
+              </Link>
             </>
           )}
         </nav>
-        <div className="flex items-center gap-3">
-          {profile ? <TrustBadge score={profile.trust_score} /> : null}
-          {profile ? (
-            <SignOutButton />
-          ) : (
-            <Link
-              href="/login"
-              className={cn(buttonVariants({ size: "sm" }), "rounded-full px-4")}
-            >
-              Enter the ledger
-            </Link>
-          )}
-        </div>
       </div>
     </header>
   );

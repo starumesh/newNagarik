@@ -1,4 +1,4 @@
--- RentSahih production schema
+-- NewNagarik production schema
 -- Privacy note: identity_hashes / banned_identities / verification_logs have RLS
 -- enabled with NO client policies. The service role (server only) bypasses RLS.
 -- Do not use `using (true)` on those tables — it would leak identity hashes.
@@ -11,8 +11,9 @@ create table if not exists public.user_profiles (
   trust_score integer default 50,
   restricted_until timestamp,
   onboarding_completed boolean default false,
-  purpose text check (purpose in ('view_trends','list_property','connect')),
+  purpose text check (purpose in ('view_trends','list_property','find_rent','connect')),
   home_city text,
+  explorer_notes jsonb default '{}'::jsonb,
   created_at timestamp default now()
 );
 
@@ -36,7 +37,26 @@ create table if not exists public.locations (
   city text not null,
   area text not null,
   building_name text not null,
+  kind text not null default 'building' check (kind in ('building','society','community')),
+  is_enabled boolean not null default true,
   unique (city, area, building_name)
+);
+
+create table if not exists public.catalog_cities (
+  id uuid primary key default gen_random_uuid(),
+  name text unique not null,
+  is_enabled boolean not null default true,
+  created_at timestamp default now()
+);
+
+create table if not exists public.catalog_areas (
+  id uuid primary key default gen_random_uuid(),
+  city text not null,
+  name text not null,
+  kind text not null default 'area' check (kind in ('area','society','community')),
+  is_enabled boolean not null default true,
+  created_at timestamp default now(),
+  unique (city, name, kind)
 );
 
 create table if not exists public.rent_entries (
@@ -57,7 +77,12 @@ create table if not exists public.rent_entries (
   metro_distance integer,
   internal_locality_avg integer,
   scraped_external_avg integer,
+  local_insights jsonb default '{}'::jsonb,
   verification_status text check (verification_status in ('auto_approved','under_review','rejected')) default 'under_review',
+  is_hidden boolean not null default false,
+  tags text[] not null default '{}',
+  photos text[] not null default '{}',
+  admin_score integer check (admin_score is null or (admin_score >= 1 and admin_score <= 10)),
   submitted_at timestamp default now()
 );
 
@@ -67,8 +92,16 @@ create table if not exists public.property_listings (
   location_id uuid references public.locations not null,
   asking_rent integer not null,
   bhk integer default 2,
+  carpet_area integer,
   furnishing text check (furnishing in ('unfurnished','semi','fully')) default 'unfurnished',
   photos text[] default '{}',
+  maintenance_status text check (maintenance_status in ('included','extra','none')) default 'extra',
+  maintenance_amount integer,
+  pet_friendly text check (pet_friendly in ('yes','no','case_by_case')) default 'case_by_case',
+  pet_case_notes text default '',
+  building_age_years integer,
+  floor_number integer,
+  facilities text[] default '{}',
   is_active boolean default true,
   created_at timestamp default now()
 );
@@ -117,7 +150,10 @@ create table if not exists public.market_snapshots (
 
 create index if not exists idx_rent_entries_location on public.rent_entries(location_id, bhk);
 create index if not exists idx_rent_entries_status on public.rent_entries(verification_status);
+create index if not exists idx_rent_entries_hidden on public.rent_entries(is_hidden);
 create index if not exists idx_locations_building on public.locations(building_name);
+create index if not exists idx_locations_enabled on public.locations(is_enabled);
+create index if not exists idx_catalog_areas_city on public.catalog_areas(city);
 create index if not exists idx_messages_receiver on public.messages(receiver_id, read_at);
 create index if not exists idx_market_city on public.market_snapshots(city);
 
@@ -125,6 +161,8 @@ alter table public.user_profiles enable row level security;
 alter table public.identity_hashes enable row level security;
 alter table public.banned_identities enable row level security;
 alter table public.locations enable row level security;
+alter table public.catalog_cities enable row level security;
+alter table public.catalog_areas enable row level security;
 alter table public.rent_entries enable row level security;
 alter table public.property_listings enable row level security;
 alter table public.messages enable row level security;
@@ -147,6 +185,16 @@ drop policy if exists "Public read locations" on public.locations;
 create policy "Public read locations"
 on public.locations for select
 using (true);
+
+drop policy if exists "Public read enabled cities" on public.catalog_cities;
+create policy "Public read enabled cities"
+on public.catalog_cities for select
+using (is_enabled = true);
+
+drop policy if exists "Public read enabled areas" on public.catalog_areas;
+create policy "Public read enabled areas"
+on public.catalog_areas for select
+using (is_enabled = true);
 
 drop policy if exists "Authenticated insert locations" on public.locations;
 create policy "Authenticated insert locations"
@@ -286,3 +334,55 @@ begin
     when undefined_object then null;
   end;
 end $$;
+
+-- Aggregator owner listings (also in migrations/007_aggregator_listings.sql)
+create table if not exists public.aggregator_listings (
+  id uuid primary key default gen_random_uuid(),
+  platform text not null
+    check (platform in ('NoBroker', '99acres', 'MyGate', 'MagicBricks', 'Anacity')),
+  external_id text not null,
+  title text not null,
+  building_name text not null default '',
+  city text not null,
+  area text not null,
+  bhk integer,
+  monthly_rent integer,
+  furnishing text,
+  url text,
+  rent_per_sqft integer,
+  posted_by text not null default 'unknown'
+    check (posted_by in ('owner', 'broker', 'unknown')),
+  posted_at timestamptz,
+  first_seen_at timestamptz not null default now(),
+  last_seen_at timestamptz not null default now(),
+  unique (platform, external_id)
+);
+
+create table if not exists public.area_watches (
+  id uuid primary key default gen_random_uuid(),
+  city text not null,
+  area text not null,
+  platforms text[] not null default array['NoBroker', 'MagicBricks', 'MyGate']::text[],
+  notify_email text,
+  is_enabled boolean not null default true,
+  last_scraped_at timestamptz,
+  created_at timestamptz not null default now(),
+  unique (city, area)
+);
+
+create table if not exists public.aggregator_alerts (
+  id uuid primary key default gen_random_uuid(),
+  watch_id uuid references public.area_watches on delete set null,
+  listing_id uuid references public.aggregator_listings on delete set null,
+  title text not null,
+  city text not null,
+  area text not null,
+  platform text not null,
+  url text,
+  created_at timestamptz not null default now(),
+  read_at timestamptz
+);
+
+alter table public.aggregator_listings enable row level security;
+alter table public.area_watches enable row level security;
+alter table public.aggregator_alerts enable row level security;

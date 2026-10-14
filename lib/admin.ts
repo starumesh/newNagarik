@@ -1,27 +1,17 @@
-import { cookies } from "next/headers";
-import { sha256 } from "@/lib/hash";
-import { env } from "@/lib/env";
+import type { User } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase/server";
 
-export const ADMIN_COOKIE = "rs_admin";
-
-export function adminCookieValue() {
-  if (!env.adminSecret) return "";
-  return sha256(`admin:${env.adminSecret}`);
+export function isAdminUser(user: User | null | undefined): boolean {
+  if (!user) return false;
+  const meta = user.app_metadata ?? {};
+  return meta.is_admin === true || meta.role === "admin";
 }
 
-export function isAdminRequest(request?: Request) {
-  const expected = adminCookieValue();
-  if (!expected) return false;
-  if (request) {
-    const header = request.headers.get("x-admin-secret");
-    if (header && sha256(`admin:${header}`) === expected) return true;
-    const cookie = request.headers
-      .get("cookie")
-      ?.split(";")
-      .map((part) => part.trim())
-      .find((part) => part.startsWith(`${ADMIN_COOKIE}=`));
-    if (cookie?.split("=")[1] === expected) return true;
-    return false;
-  }
-  return cookies().get(ADMIN_COOKIE)?.value === expected;
+export async function getAdminSession() {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!isAdminUser(user)) return { user: null, ok: false as const };
+  return { user, ok: true as const };
 }

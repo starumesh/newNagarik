@@ -3,92 +3,138 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Scale } from "lucide-react";
 import { toast } from "sonner";
+import { BrandLogo } from "@/components/brand-logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/client";
-import { isSupabaseConfigured } from "@/lib/env";
+import { isSupabaseConfigured, PUBLIC_DEV_PHONE_OTP } from "@/lib/env";
 
 export function LoginForm() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  async function sendOtp(event: React.FormEvent) {
+  async function requestCode(event: React.FormEvent) {
     event.preventDefault();
+    setError(null);
     if (!isSupabaseConfigured()) {
-      toast.error("Add Supabase keys to .env.local first.");
+      setError("Restart npm run dev after adding Supabase keys.");
       return;
     }
     setLoading(true);
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
-      },
+    const response = await fetch("/api/auth/phone/request", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone }),
     });
+    const json = await response.json();
     setLoading(false);
-    if (error) {
-      toast.error(error.message);
+    if (!response.ok) {
+      setError(json.error ?? "Could not send the code.");
       return;
     }
     setSent(true);
-    toast.success("Check your email for a 6-digit code.");
+    toast.success(json.hint ?? "Enter the code to continue.");
   }
 
-  async function verify(event: React.FormEvent) {
+  async function verifyCode(event: React.FormEvent) {
     event.preventDefault();
+    setError(null);
     setLoading(true);
-    const supabase = createClient();
-    const { error } = await supabase.auth.verifyOtp({
-      email,
-      token: otp,
-      type: "email",
+    const verified = await fetch("/api/auth/phone/verify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone, otp }),
     });
-    setLoading(false);
-    if (error) {
-      toast.error(error.message);
+    const json = await verified.json();
+    if (!verified.ok) {
+      setLoading(false);
+      setError(json.error ?? "Invalid code.");
       return;
     }
-    router.push("/onboarding");
+
+    const supabase = createClient();
+    let sessionError = (
+      await supabase.auth.verifyOtp({
+        type: "magiclink",
+        token_hash: json.token_hash,
+      })
+    ).error;
+    if (sessionError) {
+      sessionError = (
+        await supabase.auth.verifyOtp({
+          type: "email",
+          token_hash: json.token_hash,
+        })
+      ).error;
+    }
+    setLoading(false);
+    if (sessionError) {
+      setError(sessionError.message);
+      return;
+    }
+    router.push(typeof json.next === "string" ? json.next : "/dashboard");
     router.refresh();
   }
 
   return (
     <div className="mx-auto w-full max-w-md ledger-card p-8">
-      <Link href="/" className="mb-6 flex items-center gap-2 text-navy">
-        <Scale className="size-5" />
-        <span className="font-serif text-xl">RentSahih</span>
-      </Link>
-      <h1 className="font-serif text-3xl text-navy">Enter the ledger</h1>
+      <div className="mb-6">
+        <BrandLogo href="/" markSize={34} />
+      </div>
+      <h1 className="font-serif text-3xl text-navy">Enter with your mobile</h1>
       <p className="mt-2 text-sm text-muted-foreground">
-        Email OTP only. We hash identifiers for fraud checks and never publish
-        them.
+        Owners, renters, and explorers sign in with an Indian mobile number. No
+        email.
       </p>
+      <p className="mt-3 rounded-lg bg-accent px-3 py-2 text-xs text-teal-700">
+        Your privacy is our top priority. Your number stays protected and is never
+        shown publicly.
+      </p>
+      <p className="mt-2 rounded-lg bg-secondary px-3 py-2 text-xs text-muted-foreground">
+        SMS is not connected yet. Use code <strong>{PUBLIC_DEV_PHONE_OTP}</strong>{" "}
+        after requesting an OTP.
+      </p>
+
+      {error ? (
+        <p className="mt-4 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {error}
+        </p>
+      ) : null}
+
       {!sent ? (
-        <form onSubmit={sendOtp} className="mt-6 space-y-4">
+        <form onSubmit={requestCode} className="mt-6 space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              required
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              className="h-11"
-            />
+            <Label htmlFor="phone">Mobile number</Label>
+            <div className="flex gap-2">
+              <span className="grid h-11 place-items-center rounded-lg border border-input px-3 text-sm text-muted-foreground">
+                +91
+              </span>
+              <Input
+                id="phone"
+                inputMode="numeric"
+                required
+                value={phone}
+                onChange={(event) => setPhone(event.target.value)}
+                placeholder="98XXXXXXXX"
+                className="h-11"
+              />
+            </div>
           </div>
           <Button type="submit" className="h-11 w-full rounded-full" disabled={loading}>
-            {loading ? "Sending…" : "Send one-time code"}
+            {loading ? "Sending…" : "Send OTP"}
           </Button>
         </form>
       ) : (
-        <form onSubmit={verify} className="mt-6 space-y-4">
+        <form onSubmit={verifyCode} className="mt-6 space-y-4">
+          <p className="text-xs text-muted-foreground">
+            Enter the code sent to your mobile. Your number stays private.
+          </p>
           <div className="space-y-2">
             <Label htmlFor="otp">6-digit code</Label>
             <Input
@@ -101,10 +147,27 @@ export function LoginForm() {
             />
           </div>
           <Button type="submit" className="h-11 w-full rounded-full" disabled={loading}>
-            {loading ? "Verifying…" : "Continue"}
+            {loading ? "Verifying…" : "Login"}
           </Button>
+          <button
+            type="button"
+            className="w-full text-xs text-muted-foreground"
+            onClick={() => {
+              setSent(false);
+              setOtp("");
+            }}
+          >
+            Change number
+          </button>
         </form>
       )}
+
+      <p className="mt-8 text-center text-xs text-muted-foreground">
+        Moderator?{" "}
+        <Link href="/admin/login" className="text-teal-700 underline">
+          Admin desk login
+        </Link>
+      </p>
     </div>
   );
 }

@@ -10,10 +10,17 @@ export default async function OnboardingPage() {
   if (!user) redirect("/login");
   if (profile?.onboarding_completed) redirect("/dashboard");
 
+  const phone =
+    user.phone ||
+    (typeof user.user_metadata?.phone === "string"
+      ? user.user_metadata.phone
+      : "");
+
   return (
     <div className="min-h-screen bg-ledger">
       <SiteHeader profile={profile} />
-      <OnboardingWizard />
+      {/* Phone is passed for silent form submit only — never rendered in the UI. */}
+      <OnboardingWizard initialPhone={phone} />
     </div>
   );
 }

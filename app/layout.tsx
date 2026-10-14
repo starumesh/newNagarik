@@ -10,9 +10,9 @@ const sans = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "RentSahih — Trust-forced rental intelligence",
+  title: "NewNagarik — Know what people actually pay",
   description:
-    "Contribute exact rent and property facts to unlock verified building-level pricing. False entries lock you to explorer mode.",
+    "See what residents actually pay and experience in a society — lived-in rent truth you can’t get from listings alone.",
 };
 
 export default function RootLayout({

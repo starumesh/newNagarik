@@ -1,4 +1,10 @@
 {
   "framework": "nextjs",
-  "regions": ["bom1"]
+  "regions": ["bom1"],
+  "crons": [
+    {
+      "path": "/api/cron/scrape-areas",
+      "schedule": "0 */6 * * *"
+    }
+  ]
 }

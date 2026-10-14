@@ -2,16 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { canAccessGranularData } from "@/lib/access";
 import { getExternalListings } from "@/lib/scrapers";
-import { isAdminRequest } from "@/lib/admin";
+import { getAdminSession } from "@/lib/admin";
 import { isSupabaseConfigured } from "@/lib/env";
 import type { UserProfile } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
-  const admin = isAdminRequest(request);
+  const adminSession = await getAdminSession();
 
-  if (!admin) {
+  if (!adminSession.ok) {
     if (!isSupabaseConfigured()) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

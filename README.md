@@ -1,6 +1,6 @@
-# RentSahih
+# NewNagarik
 
-Trust-forced rental intelligence for Indian cities. Contributors unlock building-level rent. Explorers only see city macro trends. False entries are locked to explorer mode.
+Neighborhood rent clarity for Indian cities. Contributors unlock building-level rent. Explorers only see city macro trends.
 
 ## What you get in this MVP
 
@@ -10,7 +10,7 @@ Trust-forced rental intelligence for Indian cities. Contributors unlock building
 - 4-pillar verification engine on `/api/submit-rent` and onboarding
 - Search with BHK / furnishing / budget filters and aggregator fallback
 - Anonymous inquiry relay + Resend email (never includes renter PII)
-- Admin review at `/admin/verification` gated by `ADMIN_SECRET`
+- Admin review at `/admin/verification` gated by email/password (`ADMIN_EMAIL` / `ADMIN_PASSWORD`)
 - Cloudflare R2 photo uploads for owner listings
 - Upstash Redis cache (24h) and IP hashing for rate limits (raw IPs are never stored)
 
@@ -57,7 +57,7 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ### 3. Admin panel
 
-Set `ADMIN_SECRET` and visit `/admin/verification`. Approve publishes the entry and boosts trust. Reject sets `trust_score = 0`, `role = explorer`, bans identity hashes for 6 months.
+Sign in at `/admin/login` with `ADMIN_EMAIL` and `ADMIN_PASSWORD` from `.env.local` (defaults: `admin@newnagarik.local` / `AdminSahih1`). This is separate from renter/owner phone login. Approve publishes the entry and boosts trust. Reject sets `trust_score = 0`, `role = explorer`, bans identity hashes for 6 months.
 
 ### 4. External listings
 

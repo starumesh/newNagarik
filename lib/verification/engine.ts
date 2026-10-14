@@ -14,7 +14,8 @@ type Payload = RenterDetails & {
 
 export async function verifyRentEntry(
   userId: string,
-  payload: Payload
+  payload: Payload,
+  options?: { excludeEntryId?: string }
 ): Promise<VerificationResult> {
   const supabase = createAdminClient();
 
@@ -35,7 +36,8 @@ export async function verifyRentEntry(
   if (banned) {
     return {
       status: "blocked",
-      reason: "Submission blocked.",
+      reason:
+        "Your account isn’t able to submit right now. Please contact support if you need help.",
       pillars: {
         pillar_1_passed: false,
         pillar_2_passed: false,
@@ -56,8 +58,11 @@ export async function verifyRentEntry(
     .gte("submitted_at", since)
     .limit(15);
 
-  const distinctBuildings = new Set((recent ?? []).map((row) => row.location_id));
-  const rateLimited = distinctBuildings.size > 3 || (recent ?? []).length > 3;
+  const recentRows = (recent ?? []).filter(
+    (row) => row.id !== options?.excludeEntryId
+  );
+  const distinctBuildings = new Set(recentRows.map((row) => row.location_id));
+  const rateLimited = distinctBuildings.size > 3 || recentRows.length > 3;
   const pillar1Pass = !rateLimited;
 
   // Pillar 2: Structural feature-to-value
@@ -137,12 +142,13 @@ export async function verifyRentEntry(
   details.pillar4_triggered = shouldScrape;
 
   const allPass = pillar1Pass && pillar2Pass && pillar3Pass && pillar4Pass;
-  const status: VerificationStatus = allPass ? "auto_approved" : "under_review";
+  // Always queue for admin review — trust 100 / Verified only after admin approval.
+  const status: VerificationStatus = "under_review";
 
   return {
     status,
     reason: allPass
-      ? undefined
+      ? "Queued for admin verification."
       : rateLimited
         ? "Too many submissions in 24 hours."
         : "Entry flagged for review.",

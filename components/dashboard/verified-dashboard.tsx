@@ -1,9 +1,10 @@
-import { TrustBadge } from "@/components/trust-badge";
+import { TrustBadge, TrustScoreDisplay } from "@/components/trust-badge";
 import { formatINR } from "@/lib/format";
 import type { PropertyListing, UserProfile } from "@/lib/types";
 import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { isVerifiedTrust } from "@/lib/trust";
 
 export function VerifiedDashboard({
   profile,
@@ -14,37 +15,49 @@ export function VerifiedDashboard({
   city: string | null;
   listings: PropertyListing[];
 }) {
+  const verified = isVerifiedTrust(profile.trust_score);
+
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-teal-700">
-            Unlocked ledger
+            Your dashboard
           </p>
           <h1 className="mt-2 font-serif text-4xl text-navy">
-            {city ?? "Your city"} is now specific.
+            {city ?? "Your city"} is unlocked
           </h1>
           <p className="mt-2 max-w-xl text-sm text-muted-foreground">
-            Search any society. Read avg / median / min / max. Write to owners
-            without exposing your identity in email.
+            Search any place or community for lived-in truth: what neighbours
+            actually pay, deposit and maintenance patterns, and the day-to-day
+            issues listings never mention. Message owners privately without
+            sharing your number.
           </p>
         </div>
         <TrustBadge score={profile.trust_score} />
       </div>
       <section className="ledger-card p-6">
         <p className="text-sm text-muted-foreground">Your access tier</p>
-        <p className="mt-1 font-serif text-3xl text-navy">
-          Trust score {profile.trust_score}
-        </p>
+        <TrustScoreDisplay score={profile.trust_score} className="mt-1" />
         <p className="mt-2 text-sm">
-          Role: {profile.role} · Search, filters, and inquiry relay are on.
+          Role: {profile.role}
+          {verified
+            ? " · Verified rental review · Search and inbox are on."
+            : " · Search, filters, and inquiry relay are on."}
         </p>
-        <Link
-          href="/search"
-          className={cn(buttonVariants(), "mt-5 rounded-full")}
-        >
-          Search a building
-        </Link>
+        <div className="mt-5 flex flex-wrap gap-3">
+          <Link href="/search" className={cn(buttonVariants(), "rounded-full")}>
+            Search a place or community
+          </Link>
+          {profile.role === "renter" ? (
+            <Link
+              href="/reviews/new"
+              className={cn(buttonVariants({ variant: "outline" }), "rounded-full")}
+            >
+              Submit another rental review
+            </Link>
+          ) : null}
+        </div>
       </section>
       {profile.role === "owner" ? (
         <section>

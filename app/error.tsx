@@ -16,11 +16,9 @@ export default function ErrorPage({
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-ledger px-4 text-center">
-      <p className="text-xs uppercase tracking-[0.24em] text-teal-700">Ledger fault</p>
-      <h1 className="mt-3 font-serif text-4xl text-navy">Something went missing.</h1>
+      <h1 className="mt-3 font-serif text-4xl text-navy">Something went wrong</h1>
       <p className="mt-3 max-w-md text-sm text-muted-foreground">
-        The page recovered without exposing internals. Try again, or return to
-        the public ledger.
+        Please try again, or go back to the home page.
       </p>
       <div className="mt-6 flex gap-3">
         <button

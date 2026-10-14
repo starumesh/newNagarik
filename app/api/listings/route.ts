@@ -49,12 +49,44 @@ export async function POST(request: NextRequest) {
     location_id?: string;
     asking_rent?: number;
     bhk?: number;
+    carpet_area?: number;
     furnishing?: string;
+    maintenance_status?: "included" | "extra" | "none";
+    maintenance_amount?: number | null;
+    pet_friendly?: "yes" | "no" | "case_by_case";
+    pet_case_notes?: string;
     photos?: string[];
   };
 
-  if (!body.location_id || !body.asking_rent) {
-    return NextResponse.json({ error: "Missing listing fields." }, { status: 400 });
+  if (!body.location_id || !body.asking_rent || body.asking_rent <= 0) {
+    return NextResponse.json(
+      { error: "Please enter a positive asking rent and location." },
+      { status: 400 }
+    );
+  }
+  if (body.carpet_area != null && body.carpet_area <= 0) {
+    return NextResponse.json(
+      { error: "Carpet area must be a positive number." },
+      { status: 400 }
+    );
+  }
+  if (
+    body.maintenance_status === "extra" &&
+    (!body.maintenance_amount || body.maintenance_amount <= 0)
+  ) {
+    return NextResponse.json(
+      { error: "Please enter the monthly maintenance amount." },
+      { status: 400 }
+    );
+  }
+  if (
+    body.pet_friendly === "case_by_case" &&
+    !body.pet_case_notes?.trim()
+  ) {
+    return NextResponse.json(
+      { error: "Please briefly describe the pet policy case." },
+      { status: 400 }
+    );
   }
 
   const admin = createAdminClient();
@@ -65,14 +97,23 @@ export async function POST(request: NextRequest) {
       location_id: body.location_id,
       asking_rent: body.asking_rent,
       bhk: body.bhk ?? 2,
+      carpet_area: body.carpet_area ?? null,
       furnishing: body.furnishing ?? "unfurnished",
+      maintenance_status: body.maintenance_status ?? "extra",
+      maintenance_amount:
+        body.maintenance_status === "extra" ? body.maintenance_amount ?? null : null,
+      pet_friendly: body.pet_friendly ?? "case_by_case",
+      pet_case_notes: body.pet_case_notes ?? "",
       photos: body.photos ?? [],
     })
     .select("*")
     .single();
 
   if (error) {
-    return NextResponse.json({ error: "Could not create listing." }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn’t create the listing. Please try again." },
+      { status: 500 }
+    );
   }
   return NextResponse.json({ listing: data });
 }

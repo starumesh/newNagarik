@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { clientIp, limitByIp } from "@/lib/rate-limit";
 import { renterDetailsSchema } from "@/lib/validations";
 import { verifyRentEntry } from "@/lib/verification/engine";
+import { computeTrustScore } from "@/lib/trust";
+import { insertRentEntryWithInsights } from "@/lib/rent-entry-persist";
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";
@@ -52,20 +54,30 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Location failed." }, { status: 500 });
   }
 
+  const metroKm =
+    payload.metro_distance_km ?? payload.metro_distance ?? null;
+
   const verification = await verifyRentEntry(user.id, {
     ...payload,
+    metro_distance: metroKm ?? undefined,
     location_id: location.id,
   });
 
   if (verification.status === "blocked") {
-    return NextResponse.json({ error: "Submission blocked." }, { status: 403 });
+    return NextResponse.json(
+      {
+        error:
+          "Your account isn’t able to submit right now. Please contact support if you need help.",
+      },
+      { status: 403 }
+    );
   }
 
-  const { data: entry, error } = await admin
-    .from("rent_entries")
-    .insert({
-      user_id: user.id,
-      location_id: location.id,
+  const { id: entryId, insights, error } = await insertRentEntryWithInsights(
+    admin,
+    {
+      userId: user.id,
+      locationId: location.id,
       bhk: payload.bhk,
       monthly_rent: payload.monthly_rent,
       maintenance: payload.maintenance,
@@ -74,10 +86,15 @@ export async function POST(request: NextRequest) {
       furnishing: payload.furnishing,
       total_units: payload.total_units,
       has_lift: payload.has_lift,
-      has_parking: payload.parking !== "no",
       parking: payload.parking,
       power_backup: payload.power_backup,
-      metro_distance: payload.metro_distance,
+      metro_distance: metroKm,
+      railway_distance_km: payload.railway_distance_km ?? null,
+      airport_distance_km: payload.airport_distance_km ?? null,
+      problems_faced: payload.problems_faced ?? "",
+      hurdles: payload.hurdles ?? "",
+      local_politics: payload.local_politics ?? "",
+      legal_issues: payload.legal_issues ?? "",
       internal_locality_avg: verification.details.internal_avg
         ? Math.round(Number(verification.details.internal_avg))
         : null,
@@ -85,30 +102,44 @@ export async function POST(request: NextRequest) {
         ? Math.round(Number(verification.details.scraped_avg))
         : null,
       verification_status: verification.status,
-    })
-    .select("id")
-    .single();
+    }
+  );
 
-  if (error || !entry) {
-    return NextResponse.json({ error: "Could not save entry." }, { status: 500 });
+  if (error || !entryId) {
+    return NextResponse.json(
+      { error: error ?? "Could not save entry." },
+      { status: 500 }
+    );
   }
 
   await admin.from("verification_logs").insert({
-    rent_entry_id: entry.id,
+    rent_entry_id: entryId,
     ...verification.pillars,
-    details: verification.details,
+    details: {
+      ...verification.details,
+      local_insights: insights,
+    },
   });
 
-  if (verification.status === "auto_approved") {
-    await admin
-      .from("user_profiles")
-      .update({ role: "renter", trust_score: 100 })
-      .eq("id", user.id);
-  }
+  const { data: profile } = await admin
+    .from("user_profiles")
+    .select("purpose")
+    .eq("id", user.id)
+    .maybeSingle();
+  const trustScore = computeTrustScore({
+    role: "renter",
+    purpose: profile?.purpose,
+    verificationStatus: "under_review",
+  });
+  await admin
+    .from("user_profiles")
+    .update({ role: "renter", trust_score: trustScore })
+    .eq("id", user.id);
 
   return NextResponse.json({
     ok: true,
     status: verification.status,
     reason: verification.reason,
+    trust_score: trustScore,
   });
 }

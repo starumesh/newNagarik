@@ -4,7 +4,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { UnlockBanner } from "@/components/unlock-banner";
 import { SearchExperience } from "@/components/search/search-experience";
 import { getCurrentUserAndProfile } from "@/lib/auth";
-import { canAccessGranularData } from "@/lib/access";
+import { canAccessSearch } from "@/lib/access";
 
 export const dynamic = "force-dynamic";
 
@@ -12,15 +12,15 @@ export default async function SearchPage() {
   const { user, profile } = await getCurrentUserAndProfile();
   if (!user) redirect("/login");
   if (!profile?.onboarding_completed) redirect("/onboarding");
-  const verified = canAccessGranularData(profile);
+  const canSearch = canAccessSearch(profile);
 
   return (
     <div className="min-h-screen bg-ledger">
       <SiteHeader profile={profile} />
       <main className="mx-auto max-w-6xl px-4 py-10">
-        <SearchExperience enabled={verified} />
+        <SearchExperience enabled={canSearch} />
       </main>
-      {!verified ? <UnlockBanner /> : null}
+      {!canSearch ? <UnlockBanner /> : null}
       <SiteFooter />
     </div>
   );
